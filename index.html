@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FSBO Landlord ROI Calculator</title>
+    <meta name="description" content="Calculate the ROI of using professional broker services vs. FSBO for NYC rental properties">
+    <meta name="keywords" content="FSBO, landlord, ROI, NYC, rental, broker, real estate">
+    
+    <!-- React and dependencies from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .result-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .result-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .input-focus {
+            transition: all 0.3s ease;
+        }
+        
+        .input-focus:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function ROICalculator() {
+            const [inputs, setInputs] = useState({
+                currentRent: '',
+                bedrooms: '1',
+                borough: 'manhattan',
+                daysOnMarket: '30',
+                brokerFeePercent: '12',
+                averageTenancy: '1'
+            });
+
+            const [results, setResults] = useState({
+                marketRent: 0,
+                monthlyIncrease: 0,
+                annualIncrease: 0,
+                brokerFee: 0,
+                carryingCosts: 0,
+                netBenefit: 0,
+                monthlyAmortization: 0,
+                effectiveIncrease: 0,
+                totalBenefitOverTenancy: 0,
+                annualizedROI: 0
+            });
+
+            const marketMultipliers = {
+                manhattan: { 1: 1.15, 2: 1.12, 3: 1.10, 4: 1.08 },
+                brooklyn: { 1: 1.12, 2: 1.10, 3: 1.08, 4: 1.06 }
+            };
+
+            const handleInputChange = (field, value) => {
+                setInputs(prev => ({
+                    ...prev,
+                    [field]: value
+                }));
+            };
+
+            useEffect(() => {
+                if (inputs.currentRent) {
+                    const currentRent = parseFloat(inputs.currentRent) || 0;
+                    const tenancyYears = parseInt(inputs.averageTenancy);
+                    const multiplier = marketMultipliers[inputs.borough][inputs.bedrooms] || 1.10;
+                    const marketRent = Math.round(currentRent * multiplier);
+                    const monthlyIncrease = marketRent - currentRent;
+                    const annualIncrease = monthlyIncrease * 12;
+                    
+                    const brokerFee = Math.round((marketRent * (parseFloat(inputs.brokerFeePercent) / 100)) * 12);
+                    const dailyCarryingCost = Math.round(currentRent / 30 * 0.15);
+                    const carryingCosts = dailyCarryingCost * parseInt(inputs.daysOnMarket);
+                    const reducedDaysOnMarket = Math.round(parseInt(inputs.daysOnMarket) * 0.4);
+                    const carryingSavings = dailyCarryingCost * (parseInt(inputs.daysOnMarket) - reducedDaysOnMarket);
+                    const totalIncreaseOverTenancy = annualIncrease * tenancyYears;
+                    const totalBenefitOverTenancy = totalIncreaseOverTenancy + carryingSavings - brokerFee;
+                    const monthlyAmortization = Math.round(brokerFee / (tenancyYears * 12));
+                    const effectiveIncrease = monthlyIncrease - monthlyAmortization;
+                    const annualizedROI = ((totalBenefitOverTenancy / tenancyYears) / brokerFee * 100);
+
+                    setResults({
+                        marketRent,
+                        monthlyIncrease,
+                        annualIncrease,
+                        brokerFee,
+                        carryingCosts: carryingSavings,
+                        netBenefit: Math.round(totalBenefitOverTenancy / tenancyYears),
+                        monthlyAmortization,
+                        effectiveIncrease,
+                        totalBenefitOverTenancy,
+                        annualizedROI: Math.round(annualizedROI)
+                    });
+                }
+            }, [inputs]);
+
+            const downloadCSV = () => {
+                if (!inputs.currentRent) {
+                    alert('Please enter property details first');
+                    return;
+                }
+
+                const csvContent = [
+                    ['FSBO Landlord ROI Analysis'],
+                    [''],
+                    ['Property Details'],
+                    ['Current Monthly Rent', `$${inputs.currentRent}`],
+                    ['Bedrooms', inputs.bedrooms],
+                    ['Borough', inputs.borough.charAt(0).toUpperCase() + inputs.borough.slice(1)],
+                    ['Days on Market (FSBO)', inputs.daysOnMarket],
+                    ['Average Tenancy', `${inputs.averageTenancy} year(s)`],
+                    ['Broker Fee %', `${inputs.brokerFeePercent}%`],
+                    [''],
+                    ['Market Analysis'],
+                    ['Market-Rate Rent', `$${results.marketRent.toLocaleString()}`],
+                    ['Monthly Increase', `$${results.monthlyIncrease.toLocaleString()}`],
+                    ['Annual Increase', `$${results.annualIncrease.toLocaleString()}`],
+                    [''],
+                    ['Cost Analysis'],
+                    ['One-Time Broker Fee', `$${results.brokerFee.toLocaleString()}`],
+                    ['Carrying Cost Savings', `$${results.carryingCosts.toLocaleString()}`],
+                    [''],
+                    ['Amortization Strategy'],
+                    [`Monthly Amortization (${inputs.averageTenancy} years)`, `$${results.monthlyAmortization.toLocaleString()}`],
+                    ['Effective Monthly Increase', `$${results.effectiveIncrease.toLocaleString()}`],
+                    [''],
+                    ['ROI Summary'],
+                    ['Total Benefit Over Tenancy', `$${results.totalBenefitOverTenancy.toLocaleString()}`],
+                    ['Average Annual Benefit', `$${results.netBenefit.toLocaleString()}`],
+                    ['Annualized ROI', `${results.annualizedROI}%`]
+                ].map(row => row.join(',')).join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `FSBO_ROI_Analysis_${inputs.borough}_${inputs.bedrooms}BR.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            };
+
+            return (
+                <div className="min-h-screen py-4 px-4 sm:px-6 lg:px-8">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="text-center mb-8 lg:mb-12">
+                            <div className="animate-float inline-block">
+                                <i data-lucide="calculator" className="w-16 h-16 sm:w-20 sm:h-20 text-white mb-4"></i>
+                            </div>
+                            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
+                                FSBO Landlord ROI Calculator
+                            </h1>
+                            <p className="text-lg sm:text-xl text-white/90 max-w-2xl mx-auto">
+                                Discover how much more you could earn with professional broker services
+                            </p>
+                        </div>
+
+                        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+                            {/* Input Section */}
+                            <div className="glass-card rounded-2xl p-6 sm:p-8">
+                                <h2 className="text-2xl font-bold gradient-text mb-6">Property Details</h2>
+                                
+                                <div className="space-y-6">
+                                    {/* Current Rent */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Current Monthly Rent
+                                        </label>
+                                        <div className="relative">
+                                            <i data-lucide="dollar-sign" className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                                            <input
+                                                type="number"
+                                                placeholder="3000"
+                                                className="w-full pl-10 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all input-focus text-lg"
+                                                value={inputs.currentRent}
+                                                onChange={(e) => handleInputChange('currentRent', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Bedrooms */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Bedrooms
+                                        </label>
+                                        <select
+                                            className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all input-focus text-lg"
+                                            value={inputs.bedrooms}
+                                            onChange={(e) => handleInputChange('bedrooms', e.target.value)}>
+                                            <option value="1">1 Bedroom</option>
+                                            <option value="2">2 Bedrooms</option>
+                                            <option value="3">3 Bedrooms</option>
+                                            <option value="4">4+ Bedrooms</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Borough */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Borough
+                                        </label>
+                                        <select
+                                            className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all input-focus text-lg"
+                                            value={inputs.borough}
+                                            onChange={(e) => handleInputChange('borough', e.target.value)}>
+                                            <option value="manhattan">Manhattan</option>
+                                            <option value="brooklyn">Brooklyn</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Days on Market */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Average Days on Market (FSBO)
+                                        </label>
+                                        <div className="relative">
+                                            <i data-lucide="clock" className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                                            <input
+                                                type="number"
+                                                placeholder="30"
+                                                className="w-full pl-10 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all input-focus text-lg"
+                                                value={inputs.daysOnMarket}
+                                                onChange={(e) => handleInputChange('daysOnMarket', e.target.value)}
+                                            />
+                                        </div>
+                                        <p className="text-sm text-gray-500 mt-2">
+                                            Professional services typically reduce this by 60%
+                                        </p>
+                                    </div>
+
+                                    {/* Broker Fee */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Broker Fee Percentage
+                                        </label>
+                                        <div className="relative">
+                                            <i data-lucide="percent" className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                                            <input
+                                                type="number"
+                                                placeholder="12"
+                                                className="w-full pl-10 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all input-focus text-lg"
+                                                value={inputs.brokerFeePercent}
+                                                onChange={(e) => handleInputChange('brokerFeePercent', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Average Tenancy */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Average Tenancy (Years)
+                                        </label>
+                                        <select
+                                            className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-400 transition-all input-focus text-lg"
+                                            value={inputs.averageTenancy}
+                                            onChange={(e) => handleInputChange('averageTenancy', e.target.value)}>
+                                            <option value="1">1 Year</option>
+                                            <option value="2">2 Years</option>
+                                            <option value="3">3 Years</option>
+                                            <option value="4">4 Years</option>
+                                            <option value="5">5+ Years</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Results Section */}
+                            <div className="space-y-6">
+                                <div className="glass-card rounded-2xl p-6 sm:p-8">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h2 className="text-2xl font-bold gradient-text">ROI Analysis</h2>
+                                        {inputs.currentRent && (
+                                            <button
+                                                onClick={downloadCSV}
+                                                className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105">
+                                                <i data-lucide="download" className="w-4 h-4"></i>
+                                                <span className="hidden sm:inline">Export CSV</span>
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {inputs.currentRent ? (
+                                        <div className="space-y-4">
+                                            {/* Market Analysis */}
+                                            <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white p-4 rounded-xl">
+                                                <h3 className="font-semibold text-lg mb-2">Market Analysis</h3>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <p className="opacity-90">Market Rent</p>
+                                                        <p className="text-xl font-bold">${results.marketRent.toLocaleString()}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="opacity-90">Monthly Increase</p>
+                                                        <p className="text-xl font-bold">${results.monthlyIncrease.toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Investment Analysis */}
+                                            <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white p-4 rounded-xl">
+                                                <h3 className="font-semibold text-lg mb-2">Investment Analysis</h3>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <p className="opacity-90">Broker Fee</p>
+                                                        <p className="text-xl font-bold">${results.brokerFee.toLocaleString()}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="opacity-90">Time Savings</p>
+                                                        <p className="text-xl font-bold">${results.carryingCosts.toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* ROI Summary */}
+                                            <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-xl">
+                                                <h3 className="font-semibold text-xl mb-4">ROI Summary</h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    <div className="text-center">
+                                                        <p className="opacity-90 text-sm">Effective Monthly Increase</p>
+                                                        <p className="text-3xl font-bold">${results.effectiveIncrease.toLocaleString()}</p>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="opacity-90 text-sm">Annualized ROI</p>
+                                                        <p className="text-3xl font-bold">{results.annualizedROI}%</p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 pt-4 border-t border-white/20">
+                                                    <p className="text-center opacity-90 text-sm">Total Benefit Over {inputs.averageTenancy} Year(s)</p>
+                                                    <p className="text-center text-2xl font-bold">${results.totalBenefitOverTenancy.toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-12">
+                                            <i data-lucide="bar-chart-3" className="w-16 h-16 text-gray-400 mx-auto mb-4"></i>
+                                            <p className="text-gray-500 text-lg">Enter your property details to see ROI analysis</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Key Benefits */}
+                                <div className="glass-card rounded-2xl p-6 sm:p-8">
+                                    <h3 className="text-xl font-bold gradient-text mb-4">Why Use a Professional Broker?</h3>
+                                    <div className="space-y-3">
+                                        <div className="flex items-start space-x-3">
+                                            <i data-lucide="trending-up" className="w-5 h-5 text-green-500 mt-1"></i>
+                                            <p className="text-gray-700">Market-rate pricing expertise increases rental income</p>
+                                        </div>
+                                        <div className="flex items-start space-x-3">
+                                            <i data-lucide="clock" className="w-5 h-5 text-blue-500 mt-1"></i>
+                                            <p className="text-gray-700">Reduced vacancy time saves carrying costs</p>
+                                        </div>
+                                        <div className="flex items-start space-x-3">
+                                            <i data-lucide="shield-check" className="w-5 h-5 text-purple-500 mt-1"></i>
+                                            <p className="text-gray-700">Professional tenant screening reduces risk</p>
+                                        </div>
+                                        <div className="flex items-start space-x-3">
+                                            <i data-lucide="users" className="w-5 h-5 text-orange-500 mt-1"></i>
+                                            <p className="text-gray-700">Access to larger pool of qualified tenants</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Initialize Lucide icons after DOM loads
+        document.addEventListener('DOMContentLoaded', () => {
+            ReactDOM.render(<ROICalculator />, document.getElementById('root'));
+            // Initialize Lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+</html>
